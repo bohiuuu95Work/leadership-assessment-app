@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leadership Assessment App</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <style>
+        /* Custom styles for better typography and chart aesthetics */
+        body { font-family: 'Inter', sans-serif; background-color: #f7f9fc; }
+        .card { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+        .chart-container { height: 400px; }
+        @media (min-width: 1024px) {
+            .chart-container { height: 500px; }
+        }
+        /* Style for the radio buttons */
+        input[type="radio"] + label {
+            transition: all 0.15s ease-in-out;
+            user-select: none;
+            cursor: pointer;
+        }
+        input[type="radio"]:checked + label {
+            background-color: #10b981; /* Emerald 500 */
+            color: white;
+            border-color: #059669; /* Emerald 600 */
+            transform: scale(1.05);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-indigo-700 tracking-tight">Leadership Assessment App</h1>
+            <p class="text-lg sm:text-xl text-gray-600 mt-2">Rate the leader's frequency of action (1=Rarely/Seldom to 4=Very Frequently).</p>
+        </header>
+
+        <!-- Assessment Form Section -->
+        <section class="mb-10 p-4 sm:p-6 bg-white card rounded-xl border border-gray-200">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">40 Leadership Assessment Items</h2>
+            <div id="statusMessage" class="hidden p-3 mb-4 rounded-lg text-sm font-medium" role="alert"></div>
+
+            <form id="assessmentForm">
+                <div id="questionsContainer" class="space-y-4">
+                    <!-- Questions will be dynamically injected here -->
+                </div>
+                
+                <div class="mt-8">
+                    <button type="submit" class="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:bg-indigo-700 transition duration-150 transform hover:scale-[1.01] focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-opacity-50">
+                        Generate Leadership Report
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <hr class="mb-10">
+
+        <!-- Results Section (Initially Hidden) -->
+        <div id="results-area" class="hidden">
+            <h2 class="text-3xl font-bold text-blue-700 mb-6 border-b-2 border-blue-200 pb-2">Your Leadership Assessment Results</h2>
+
+            <!-- Practices Analysis Section -->
+            <section class="mb-12">
+                <h3 class="text-2xl font-semibold text-gray-800 mb-4">1. 5 Practices of Exemplary Leadership (LPI)</h3>
+                <div id="practices-tables" class="mb-8">
+                    <!-- Table for LPI will be rendered here -->
+                </div>
+
+                <div class="card bg-white p-6 rounded-xl overflow-x-auto">
+                    <div class="chart-container">
+                        <canvas id="practicesChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TMLH Attributes Analysis Section -->
+            <section class="mb-12">
+                <h3 class="text-2xl font-semibold text-gray-800 mb-4">2. TMLH Attribute Analysis</h3>
+                <div id="tmlh-tables" class="mb-8">
+                    <!-- Table for TMLH will be rendered here -->
+                </div>
+
+                <div class="card bg-white p-6 rounded-xl overflow-x-auto">
+                    <div class="chart-container">
+                        <canvas id="tmlhChart"></canvas>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // -----------------------------------------------------------
+        // 1. DEFINITIVE DATA MAPPINGS AND ITEMS
+        // -----------------------------------------------------------
+
+        const LPI_PRACTICES = {
+            MW: 'Model the Way', ISV: 'Inspire a Shared Vision', CP: 'Challenge the Process',
+            EOA: 'Enable Others to Act', EH: 'Encourage the Heart',
+        };
+        const PRACTICE_KEYS_CYCLIC = ['MW', 'ISV', 'CP', 'EOA', 'EH']; // The cycle order
+
+        const TMLH_ATTRIBUTES = {
+            Int: 'Integrity', P: 'Purpose', Ini: 'Initiative', D: 'Discernment', 
+            N: 'Nurturing', H: 'Humility', R: 'Resilience',
+        };
+
+        // Complete list of 40 items. The 'practice' key is dynamically assigned
+        const BASE_LPI_ITEMS = [
+            // The items and their TMLH attributes remain constant based on the CSV data.
+            { id: 1, text: "Sets a personal example of what he or she expects from other people.", tmlh: ['Int'] },
+            { id: 2, text: "Looks ahead and communicates about what he or she believes will impact the future.", tmlh: ['P'] },
+            { id: 3, text: "Looks around for ways to develop and challenge his or her skills and abilities.", tmlh: ['Ini', 'D'] },
+            { id: 4, text: "Fosters cooperative rather than competitive relationships among people he or she works with.", tmlh: ['N'] },
+            { id: 5, text: "Praises people for a job well done.", tmlh: ['N', 'H'] },
+            { id: 6, text: "Spends time and energy making sure that people in the team adhere to the principles and standards agreed on.", tmlh: ['Int'] },
+            { id: 7, text: "Describes to others in the team what they should be capable of accomplishing.", tmlh: ['N', 'P'] },
+            { id: 8, text: "Looks for ways that others can try out new ideas and methods.", tmlh: ['H', 'Ini', 'N'] },
+            
+            { id: 9, text: "Actively listens to diverse points of view.", tmlh: ['H'] },
+            { id: 10, text: "Encourages others as they work on tasks during the activity.", tmlh: ['N'] },
+            { id: 11, text: "Follows through on the promises and commitments he or she makes during the activity.", tmlh: ['Int'] },
+            { id: 12, text: "Uses images and stories to describe possibilities for the future.", tmlh: ['P'] }, 
+            { id: 13, text: "Challenges the team to try new ways of working.", tmlh: ['Ini', 'D'] }, 
+            { id: 14, text: "Helps team members find common ground and shared goals.", tmlh: ['N'] }, 
+            { id: 15, text: "Recognizes people for their contributions to the success of the team.", tmlh: ['N', 'H'] }, 
+            { id: 16, text: "Is clear about his or her leadership philosophy.", tmlh: ['Int'] }, 
+            
+            { id: 17, text: "Seeks out challenging opportunities that test his or her abilities.", tmlh: ['P'] },
+            { id: 18, text: "Takes initiative in experimenting with the way we can do things in the team.", tmlh: ['Ini', 'R'] },
+            { id: 19, text: "Asks for feedback on how his or her actions affect the team's performance.", tmlh: ['H'] }, 
+            { id: 20, text: "Supports the decisions that team members make.", tmlh: ['N', 'H'] }, 
+            { id: 21, text: "Makes sure that the team's actions are consistent with its stated values.", tmlh: ['Int'] }, 
+            { id: 22, text: "Paints an exciting picture of the long-term future for the team.", tmlh: ['P'] }, 
+            { id: 23, text: "Looks for innovative ways to improve team results.", tmlh: ['Ini', 'D'] }, 
+            { id: 24, text: "Gets the team to work effectively with other teams/groups.", tmlh: ['N'] }, 
+
+            { id: 25, text: "Finds ways for us to celebrate accomplishments.", tmlh: ['N'] },
+            { id: 26, text: "Talks about the values and principles that guide his or her actions.", tmlh: ['Int'] },
+            { id: 27, text: "Speaks with conviction about the higher purpose and meaning of what we are doing.", tmlh: ['P'] },
+            { id: 28, text: "Takes initiative in experimenting with the way we can do things in the team.", tmlh: ['Ini'] },
+            { id: 29, text: "Provides opportunities for others to take on leadership responsibilities.", tmlh: ['N', 'H'] },
+            { id: 30, text: "Makes sure that people in the team are creatively recognized for their contributions.", tmlh: ['N'] },
+            { id: 31, text: "Successfully carries out planned events / tasks.", tmlh: ['D', 'R'] },
+            { id: 32, text: "Communicates clearly with others about assigned tasks and ideas.", tmlh: ['P', 'D'] },
+
+            { id: 33, text: "Presses on in the face of difficulties.", tmlh: ['R'] },
+            { id: 34, text: "Shares information and resources with teammates.", tmlh: ['N'] },
+            { id: 35, text: "Is spontaneous in thanking or praising others for their contribution.", tmlh: ['N'] },
+            { id: 36, text: "Makes morally sound decisions.", tmlh: ['Int', 'D'] },
+            { id: 37, text: "Articulates and expresses the needs of the team.", tmlh: ['D', 'H', 'P'] },
+            { id: 38, text: "Generates creative solutions.", tmlh: ['D', 'Ini'] },
+            { id: 39, text: "Involves team members in making important decisions.", tmlh: ['D', 'H'] },
+            { id: 40, text: "Shows care and concern for teammates when they are tired or demoralized.", tmlh: ['N', 'P'] }
+        ];
+
+        // Process the BASE_LPI_ITEMS to assign the correct cyclic practice key
+        const LPI_ITEMS = BASE_LPI_ITEMS.map(item => {
+            // (ID - 1) % 5 determines the index in the 5-item cycle
+            const practiceKey = PRACTICE_KEYS_CYCLIC[(item.id - 1) % 5];
+            return {
+                ...item,
+                practice: practiceKey,
+            };
+        });
+        
+        // Helper to map Item ID to LPI Practice Key
+        function getLpiKey(itemId) {
+            return LPI_ITEMS.find(item => item.id === itemId)?.practice || null;
+        }
+
+
+        // -----------------------------------------------------------
+        // 2. FORM RENDERING AND SUBMISSION
+        // -----------------------------------------------------------
+
+        function renderQuestions() {
+            const container = document.getElementById('questionsContainer');
+            let html = '';
+
+            LPI_ITEMS.forEach(item => {
+                const practiceName = LPI_PRACTICES[item.practice];
+                html += `
+                    <div class="p-4 border border-gray-200 rounded-lg bg-white shadow-md hover:shadow-lg transition duration-200">
+                        <p class="text-sm font-semibold text-indigo-600 mb-2">${item.id}. [${item.practice}: ${practiceName}]</p>
+                        <p class="text-gray-900 font-medium">${item.text}</p>
+                        <div class="flex space-x-2 mt-3 justify-between sm:justify-start sm:space-x-4">
+                            ${[1, 2, 3, 4].map(score => `
+                                <input type="radio" id="q${item.id}_s${score}" name="q${item.id}" value="${score}" class="hidden" required />
+                                <label for="q${item.id}_s${score}" class="flex-1 sm:flex-none cursor-pointer px-2 py-1 sm:px-4 sm:py-2 border border-gray-300 rounded-lg text-sm font-semibold text-center text-gray-700 hover:border-indigo-400" title="${getScoreDescription(score)}">
+                                    ${score}
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function getScoreDescription(score) {
+            switch (score) {
+                case 1: return "1 - RARELY OR SELDOM";
+                case 2: return "2 - SOMETIMES";
+                case 3: return "3 - OFTEN";
+                case 4: return "4 - VERY FREQUENTLY";
+                default: return "";
+            }
+        }
+
+        function handleFormSubmission(event) {
+            event.preventDefault();
+            clearResults();
+            
+            const form = document.getElementById('assessmentForm');
+            const statusDiv = document.getElementById('statusMessage');
+            const formData = new FormData(form);
+            const rawScores = [];
+
+            // 1. Validate and collect scores
+            let allAnswered = true;
+            for (let i = 1; i <= 40; i++) {
+                const score = formData.get(`q${i}`);
+                if (score === null) {
+                    allAnswered = false;
+                    break;
+                }
+                rawScores.push(parseInt(score, 10));
+            }
+
+            if (!allAnswered) {
+                statusDiv.className = 'p-3 mb-4 rounded-lg text-sm font-medium bg-yellow-100 text-yellow-700';
+                statusDiv.innerHTML = `<span class="font-bold">Missing Answers:</span> Please answer all 40 questions before submitting.`;
+                statusDiv.style.display = 'block';
+                document.getElementById('results-area').classList.add('hidden');
+                return;
+            }
+
+            // Clear status message
+            statusDiv.style.display = 'none';
+
+            // 2. Map raw scores to the data structure
+            const structuredData = rawScores.map((score, index) => {
+                const itemId = index + 1;
+                const item = LPI_ITEMS.find(i => i.id === itemId);
+                
+                return {
+                    itemId: itemId,
+                    score: score,
+                    practice: item.practice, // This is now the cyclically assigned practice
+                    tmlh: item.tmlh
+                };
+            });
+
+            // 3. Process and render results
+            try {
+                const summary = processLeadershipData(structuredData);
+                renderSummaryTable('Your', summary, 'practices-tables', 'blue', false);
+                renderSummaryTable('Your', summary, 'tmlh-tables', 'green', true);
+                renderPracticesChart(summary);
+                renderTmlhChart(summary);
+                
+                // Show the results section and scroll to it
+                const resultsArea = document.getElementById('results-area');
+                resultsArea.classList.remove('hidden');
+                
+                // Add a small delay for smoother UI transition before scrolling
+                setTimeout(() => {
+                    resultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 50);
+
+            } catch (error) {
+                console.error("Failed to generate report:", error);
+                statusDiv.className = 'p-3 mb-4 rounded-lg text-sm font-medium bg-red-100 text-red-700';
+                statusDiv.innerHTML = `<span class="font-bold">A Critical Error Occurred:</span> Failed to process scores. Check the console for details.`;
+                statusDiv.style.display = 'block';
+            }
+        }
+
+
+        // -----------------------------------------------------------
+        // 3. DATA PROCESSING LOGIC
+        // -----------------------------------------------------------
+        
+        function processLeadershipData(data) {
+            const practicesSummary = {};
+            const tmlhSummary = {};
+
+            // Step 1: Initialize summaries and calculate definitive TMLH Item Counts
+            const tmlhItemCounts = {};
+            Object.keys(TMLH_ATTRIBUTES).forEach(key => tmlhItemCounts[key] = 0);
+            
+            // Practices initialization (static 8 items/32 max score per practice)
+            Object.keys(LPI_PRACTICES).forEach(key => {
+                 practicesSummary[key] = {
+                    name: LPI_PRACTICES[key],
+                    totalScore: 0,
+                    itemCount: 8,
+                    maxScore: 32,
+                };
+            });
+
+
+            data.forEach(item => {
+                // Count TMLH items
+                item.tmlh.forEach(tmlhKey => {
+                    if (TMLH_ATTRIBUTES[tmlhKey]) {
+                        tmlhItemCounts[tmlhKey] = (tmlhItemCounts[tmlhKey] || 0) + 1;
+                    }
+                });
+            });
+
+            // Initialize TMLH Summary using the dynamically calculated Item Counts
+            Object.keys(TMLH_ATTRIBUTES).forEach(key => {
+                const itemCount = tmlhItemCounts[key] || 0;
+                tmlhSummary[key] = {
+                    name: TMLH_ATTRIBUTES[key],
+                    totalScore: 0,
+                    itemCount: itemCount, 
+                    maxScore: itemCount * 4, // Item Count * Max Score (4)
+                };
+            });
+
+            // Step 2: Sum the scores for both Practices and TMLH
+            data.forEach(item => {
+                const score = item.score;
+                const practiceKey = item.practice; // Use the cyclically assigned practice
+
+                // 1. Practices Calculation
+                if (practicesSummary[practiceKey]) {
+                    practicesSummary[practiceKey].totalScore += score;
+                }
+
+                // 2. TMLH Calculation
+                item.tmlh.forEach(tmlhKey => {
+                    if (tmlhSummary[tmlhKey]) {
+                        tmlhSummary[tmlhKey].totalScore += score;
+                    }
+                });
+            });
+
+            // Step 3: Calculate Final Percentages and Fractions
+            [practicesSummary, tmlhSummary].forEach(summary => {
+                Object.values(summary).forEach(s => {
+                    s.percentage = (s.maxScore > 0) ? (s.totalScore / s.maxScore) * 100 : 0; 
+                    s.fractionalScore = `${s.totalScore}/${s.maxScore}`;
+                });
+            });
+            
+            return { practices: practicesSummary, tmlh: tmlhSummary };
+        }
+
+        // -----------------------------------------------------------
+        // 4. RENDERING TABLES AND CHARTS
+        // -----------------------------------------------------------
+        
+        let practicesChartInstance;
+        let tmlhChartInstance;
+        
+        function clearResults() {
+            document.getElementById('practices-tables').innerHTML = '';
+            document.getElementById('tmlh-tables').innerHTML = '';
+            // Destroy existing Chart instances to prevent memory leaks/redraw issues
+            if (practicesChartInstance) practicesChartInstance.destroy();
+            if (tmlhChartInstance) tmlhChartInstance.destroy();
+        }
+
+        function renderSummaryTable(studentName, studentSummary, containerId, highlightColor, isTmlh) {
+            const summary = isTmlh ? studentSummary.tmlh : studentSummary.practices;
+            const title = isTmlh ? `TMLH Attribute Scores` : `LPI Practice Scores`;
+            const headerColor = isTmlh ? 'bg-green-50' : 'bg-blue-50';
+            const tableColor = isTmlh ? 'text-green-600' : 'text-blue-600';
+            const tableContainer = document.getElementById(containerId);
+            
+            const table = document.createElement('div');
+            table.className = 'card bg-white p-6 rounded-xl overflow-x-auto lg:col-span-1';
+            
+            table.innerHTML = `
+                <h4 class="text-xl font-semibold text-gray-800 mb-4">${title}</h4>
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="${headerColor}">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${isTmlh ? 'Attribute (Code)' : 'Practice'}</th>
+                            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Score (Fraction)</th>
+                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">% of Max</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        ${Object.keys(summary).map(key => {
+                            const item = summary[key];
+                            const nameWithCode = isTmlh ? `${item.name} (${key})` : item.name;
+                            const finalColumn = `${item.percentage.toFixed(1)}%`;
+                            
+                            // Skip if TMLH item count is 0 (shouldn't happen with current data, but good safeguard)
+                            if (isTmlh && item.itemCount === 0) return '';
+                            
+                            return `
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${nameWithCode}</td>
+                                    <td class="px-3 py-3 whitespace-nowrap text-sm text-center font-bold ${tableColor}">${item.fractionalScore}</td>
+                                    <td class="px-3 py-3 whitespace-nowrap text-sm font-bold ${tableColor} text-right">${finalColumn}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+                ${isTmlh ? `<p class="text-xs text-gray-500 mt-4">*Scores for TMLH Attributes are normalized by the number of associated items (which varies).</p>` : ''}
+            `;
+            tableContainer.appendChild(table);
+        }
+
+        function renderPracticesChart(summary) {
+            const labels = Object.values(summary.practices).map(p => p.name);
+            const data = Object.values(summary.practices).map(p => p.percentage.toFixed(1));
+            const ctx = document.getElementById('practicesChart').getContext('2d');
+            
+            practicesChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Score (% of Max)',
+                            data: data,
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)', // blue-500
+                            borderColor: '#3b82f6',
+                            borderWidth: 1,
+                            borderRadius: 6,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: '5 Practices Performance (% of Max Score)',
+                            font: { size: 18, weight: 'bold' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Percentage of Max Score (%)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderTmlhChart(summary) {
+            const labels = Object.values(summary.tmlh).map(t => t.name);
+            const data = Object.values(summary.tmlh).map(t => t.percentage.toFixed(1));
+            const ctx = document.getElementById('tmlhChart').getContext('2d');
+
+            tmlhChartInstance = new Chart(ctx, {
+                type: 'polarArea',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Score (% of Max)',
+                            data: data,
+                            backgroundColor: [
+                                'rgba(16, 185, 129, 0.7)', // green (Integrity)
+                                'rgba(245, 158, 11, 0.7)', // yellow (Purpose)
+                                'rgba(239, 68, 68, 0.7)', // red (Initiative)
+                                'rgba(99, 102, 241, 0.7)', // indigo (Discernment)
+                                'rgba(6, 182, 212, 0.7)', // cyan (Nurturing)
+                                'rgba(236, 72, 153, 0.7)', // pink (Humility)
+                                'rgba(139, 92, 246, 0.7)'  // violet (Resilience)
+                            ],
+                            borderColor: '#fff',
+                            borderWidth: 2,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' },
+                        title: {
+                            display: true,
+                            text: 'TMLH Attributes Performance (% of Max Score)',
+                            font: { size: 18, weight: 'bold' }
+                        }
+                    },
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                backdropColor: 'rgba(247, 249, 252, 0.8)' // Match body background
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // -----------------------------------------------------------
+        // 5. INITIALIZATION
+        // -----------------------------------------------------------
+        
+        window.onload = function() {
+            renderQuestions();
+            document.getElementById('assessmentForm').addEventListener('submit', handleFormSubmission);
+        };
+
+    </script>
+</body>
+</html>
